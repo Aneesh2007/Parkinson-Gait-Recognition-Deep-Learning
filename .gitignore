@@ -1,0 +1,34 @@
+# Python
+__pycache__/
+*.py[cod]
+
+# Virtual environments
+venv/
+.venv/
+
+# VS Code
+.vscode/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Dataset
+data/
+
+# Model weights
+models/*.pth
+models/*.pt
+
+# OS
+.DS_Store
+Thumbs.db
+
+processed_data/
+data/
+venv/
+__pycache__/
+*.py[cod]
+models/*.pth
+models/*.pt
+.vscode/
+.ipynb_checkpoints/
