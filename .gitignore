@@ -1,34 +1,50 @@
+# =========================
 # Python
+# =========================
 __pycache__/
 *.py[cod]
+*.so
 
-# Virtual environments
+# =========================
+# Virtual Environment
+# =========================
 venv/
 .venv/
+env/
 
-# VS Code
-.vscode/
-
+# =========================
 # Jupyter
+# =========================
 .ipynb_checkpoints/
 
+# =========================
+# VS Code
+# =========================
+.vscode/
+
+# =========================
 # Dataset
+# =========================
 data/
 
-# Model weights
-models/*.pth
-models/*.pt
+# =========================
+# Generated / processed data
+# =========================
+processed_data/
 
+# =========================
+# Trained models
+# =========================
+models/
+
+# =========================
+# Environment / secrets
+# =========================
+.env
+.env.*
+
+# =========================
 # OS
+# =========================
 .DS_Store
 Thumbs.db
-
-processed_data/
-data/
-venv/
-__pycache__/
-*.py[cod]
-models/*.pth
-models/*.pt
-.vscode/
-.ipynb_checkpoints/
