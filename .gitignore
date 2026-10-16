@@ -48,3 +48,8 @@ models/
 # =========================
 .DS_Store
 Thumbs.db
+# insole project
+*.db
+__pycache__/
+*.csv
+dashboard/uv.log

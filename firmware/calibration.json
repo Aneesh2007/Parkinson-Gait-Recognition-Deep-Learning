@@ -1,0 +1,12 @@
+{
+  "date": "2026-10-14T18:00:00",
+  "note": "Reconstructed from the calibrate.py summary printed on 14 Oct (bottle test). Use your own calibration.json if you have it.",
+  "channels": ["L_toe", "L_mid", "L_heel", "R_toe", "R_mid", "R_heel"],
+  "baseline": [4095, 3894, 4095, 4095, 4095, 4095],
+  "noise": [0, 19, 75, 0, 0, 0],
+  "loaded": [3178, 3506, 3394, 1991, 753, 3005],
+  "drop": [917, 388, 701, 2104, 3342, 1090],
+  "gain": [1.09, 2.59, 1.43, 0.48, 0.3, 0.92],
+  "reference_drop": 1004,
+  "saturated": [false, false, false, false, false, false]
+}
