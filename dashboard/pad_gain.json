@@ -1,0 +1,11 @@
+{
+ "gain": [
+  1,
+  1.61,
+  1,
+  1,
+  0.62,
+  1
+ ],
+ "note": "Fixed per-pad gain from 7 steady recordings: equalises the typical swing of the left and right mid-foot pads (hardware difference). Shared by everyone, so a person's own L/R asymmetry is kept. Ignored for pads that have a calibration.json entry."
+}

@@ -1,0 +1,1322 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Smart insole: gait dashboard</title>
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: light;
+    --paper: #eef1f5; --surface: #ffffff; --raise: #f6f8fb;
+    --text-primary: #0f1c33; --text-secondary: #46566f; --text-muted: #66768e;
+    --grid: #e6ebf2; --border: #dce3ec; --hover: #edf1f7;
+    --accent: #2457d6; --ink: #0f1c33; --on-ink: #f2f6ff;
+    --plate: #0f1c33; --plate-2: #1a2b4b; --plate-text: #e9efff; --plate-muted: #93a4c4; --plate-line: #2a3d63;
+    --foot-l: #2a78d6; --foot-r: #eb6834;       /* categorical slots 1 and 2 */
+    --m-asym: #1baf7a; --m-cv: #6250d6;         /* categorical slots 3 and 7 */
+    --good: #0c8f3a; --critical: #d03b3b; --warn: #b26a00;
+    --good-bg: #e7f6ec; --critical-bg: #fdecec; --warn-bg: #fff3df;
+    --foot-fill: #edf1f7;
+    --display: "Bricolage Grotesque", "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+    --body: "Instrument Sans", "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, sans-serif;
+    --shadow: 0 1px 2px rgba(15,28,51,.05), 0 6px 20px rgba(15,28,51,.06);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --paper: #0a111f; --surface: #121b2d; --raise: #17223a;
+      --text-primary: #eaf0fc; --text-secondary: #b9c5dc; --text-muted: #94a3bf;
+      --grid: #223048; --border: #243350; --hover: #1a2640;
+      --accent: #6c93ff; --ink: #eaf0fc; --on-ink: #0f1c33;
+      --plate: #0b1426; --plate-2: #15223c; --plate-line: #24365a;
+      --foot-l: #3987e5; --foot-r: #e86a35;
+      --m-asym: #199e70; --m-cv: #9085e9; --warn: #e0a040; --good: #35b865; --critical: #ef6a6a;
+      --good-bg: #10281b; --critical-bg: #321618; --warn-bg: #33270f;
+      --foot-fill: #1a2640; --shadow: 0 1px 2px rgba(0,0,0,.4);
+    }
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html { scroll-behavior: smooth; }
+  body { margin: 0; background: var(--paper); color: var(--text-primary);
+         font: 15px/1.55 var(--body); -webkit-font-smoothing: antialiased; }
+  .shell { display: grid; grid-template-columns: 88px minmax(0, 1fr); min-height: 100vh; }
+
+  /* navigation rail */
+  .rail { position: sticky; top: 0; height: 100vh; background: var(--ink); color: var(--on-ink);
+          display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 18px 8px; }
+  .logo { width: 44px; height: 44px; margin-bottom: 14px; }
+  .rail a { width: 72px; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 9px 4px;
+            color: var(--on-ink); opacity: .66; text-decoration: none; font-size: 12px; font-weight: 500; border-radius: 12px; position: relative; }
+  .rail a svg { width: 22px; height: 22px; }
+  .rail a:hover { opacity: 1; background: rgba(255,255,255,.08); }
+  .rail a[aria-current=page] { opacity: 1; background: rgba(255,255,255,.14); }
+  .rail .count { position: absolute; top: 4px; right: 10px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px;
+                 background: var(--critical); color: #fff; font-size: 11px; font-weight: 600; line-height: 18px; text-align: center; }
+  .rail .count:empty { display: none; }
+  .rail .spacer { flex: 1; }
+
+  .wrap { max-width: 1180px; width: 100%; margin: 0 auto; padding: 22px 28px 40px; }
+  .topline { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; margin-bottom: 18px; }
+  .brand { font: 700 22px/1.1 var(--display); letter-spacing: -.01em; margin: 0; }
+  .brand small { display: block; font: 400 13px/1.4 var(--body); letter-spacing: 0; color: var(--text-secondary); margin-top: 2px; }
+  h2 { font: 600 16px/1.3 var(--display); margin: 0 0 10px; letter-spacing: -.005em; }
+  .note { color: var(--text-secondary); font-size: 13px; }
+  .badge { display: inline-block; padding: 3px 10px; border: 1px solid var(--border); background: var(--surface);
+           border-radius: 999px; font-size: 12px; color: var(--text-secondary); }
+
+  /* controls */
+  .filters { display: flex; flex-wrap: wrap; gap: 10px 12px; align-items: center; margin-bottom: 16px; }
+  select, button, input[type=text], input[type=search], textarea {
+    font: inherit; color: var(--text-primary); background: var(--surface);
+    border: 1px solid var(--border); border-radius: 10px; padding: 8px 12px; }
+  textarea { width: 100%; resize: vertical; min-height: 72px; }
+  button { cursor: pointer; transition: background .12s, border-color .12s; }
+  button:hover { background: var(--hover); }
+  button.primary { background: var(--ink); color: var(--on-ink); border-color: var(--ink); font-weight: 600; padding: 9px 20px; }
+  button.primary:hover { filter: brightness(1.25); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; flex-wrap: wrap; background: var(--surface); }
+  .seg button { border: 0; border-radius: 0; background: transparent; padding: 8px 14px; color: var(--text-secondary); }
+  .seg button[aria-pressed=true] { background: var(--ink); color: var(--on-ink); font-weight: 600; }
+  .plate .seg { background: var(--plate-2); border-color: var(--plate-line); }
+  .plate .seg button { color: var(--plate-muted); }
+  .plate .seg button[aria-pressed=true] { background: var(--plate-text); color: var(--plate); }
+
+  .grid { display: grid; gap: 16px; }
+  .grid > * { min-width: 0; }
+  .two { grid-template-columns: 1fr 1fr; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 18px 20px; box-shadow: var(--shadow); }
+  .gap { margin-top: 16px; }
+
+  /* readouts */
+  .kpis { grid-template-columns: repeat(4, 1fr); }
+  .kpi { padding: 14px 16px; }
+  .kpi .label { color: var(--text-secondary); font-size: 13px; }
+  .kpi .value { font: 700 32px/1.15 var(--display); letter-spacing: -.02em; margin-top: 2px; }
+  .kpi .unit { font: 400 13px var(--body); letter-spacing: 0; color: var(--text-secondary); margin-left: 5px; }
+  .kpi .sub { color: var(--text-muted); font-size: 12px; min-height: 18px; margin-top: 2px; }
+  .kpi.ok { background: var(--good-bg); border-color: transparent; }
+  .kpi.bad { background: var(--critical-bg); border-color: transparent; }
+  .status { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; }
+  .status svg { width: 18px; height: 18px; flex: none; }
+  .kpi .value .status { font: 600 20px/1.3 var(--display); }
+  .trendchip { display: inline-flex; align-items: center; gap: 5px; }
+  .trendchip svg { width: 16px; height: 16px; flex: none; }
+  main.loading .chart, main.loading .kpis { opacity: .6; }
+
+  /* patient strip and hero */
+  .pstrip { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 6px 18px; margin-bottom: 14px; }
+  .pstrip .back { align-self: flex-start; width: 100%; }
+  .pstrip h2.name { font: 700 30px/1.1 var(--display); letter-spacing: -.02em; margin: 0; }
+  .pstrip .tools { margin-left: auto; display: flex; flex-wrap: wrap; gap: 8px 10px; align-items: center; }
+  a.back { color: var(--text-secondary); text-decoration: none; font-size: 13px; }
+  a.back:hover { text-decoration: underline; }
+  .hero { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 16px; align-items: stretch; }
+  .hero-right { display: flex; flex-direction: column; gap: 16px; }
+  .hero-right .kpis { grid-template-columns: 1fr 1fr; }
+  .modenote { margin: 0; padding: 12px 14px; border-radius: 12px; background: var(--raise); border: 1px solid var(--border); font-size: 13px; color: var(--text-secondary); }
+  .modenote b { color: var(--text-primary); font-weight: 600; }
+
+  /* dark plate that holds the foot maps */
+  .plate { background: var(--plate); border-color: var(--plate-line); color: var(--plate-text); --text-muted: var(--plate-muted); --text-secondary: var(--plate-muted); --text-primary: var(--plate-text);
+           --foot-fill: var(--plate-2); --border: var(--plate-line); --hover: var(--plate-2); --surface: var(--plate-2); }
+  .plate h2 { color: var(--plate-text); }
+  .plate .note { color: var(--plate-muted); }
+  .plate select, .plate button { background: var(--plate-2); color: var(--plate-text); border-color: var(--plate-line); }
+  .plate button:hover { background: #22365c; }
+  .plate input[type=range] { accent-color: #f58b4a; }
+
+  /* charts */
+  .chart { position: relative; width: 100%; }
+  .chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+  .tip { position: absolute; pointer-events: none; z-index: 2; min-width: 130px;
+         background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+         padding: 6px 10px; font-size: 13px; box-shadow: 0 4px 14px rgba(0,0,0,.18); }
+  .tip .t { color: var(--text-secondary); font-size: 12px; margin-bottom: 2px; }
+  .tip .r { display: flex; align-items: center; gap: 6px; }
+  .tip .k { width: 12px; height: 0; border-top: 3px solid; border-radius: 2px; flex: none; }
+  .tip .v { font-weight: 600; }
+  .tip .n { color: var(--text-secondary); }
+  .legend { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 13px; color: var(--text-secondary); margin-bottom: 4px; }
+  .legend span::before { content: ""; display: inline-block; width: 14px; border-top: 3px solid var(--c); border-radius: 2px; vertical-align: middle; margin-right: 6px; }
+  .empty { color: var(--text-muted); padding: 26px 0; text-align: center; font-size: 14px; }
+  .empty b { display: block; color: var(--text-primary); font: 600 17px var(--display); margin-bottom: 4px; }
+
+  /* tables */
+  .scroll { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  th { color: var(--text-secondary); font-weight: 500; font-size: 13px; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  tbody tr.click { cursor: pointer; }
+  tbody tr.click:hover { background: var(--hover); }
+  tbody tr[aria-selected=true] { background: var(--hover); box-shadow: inset 3px 0 0 var(--accent); font-weight: 600; }
+  tbody tr:last-child td { border-bottom: 0; }
+  #caseTable td .sub { max-width: 220px; }
+  #sessions { font-size: 13px; }
+  #sessions th, #sessions td { padding: 8px 6px; }
+  td .sub { display: block; color: var(--text-muted); font-size: 12px; font-weight: 400; max-width: 250px; overflow: hidden; text-overflow: ellipsis; }
+  td.spark svg { display: block; }
+  .overdue { color: var(--warn); font-weight: 600; font-size: 12px; }
+  ul.alerts { list-style: none; margin: 0; padding: 0; max-height: 420px; overflow: auto; }
+  ul.alerts li { padding: 10px 0; border-bottom: 1px solid var(--border); }
+  ul.alerts button { all: unset; cursor: pointer; display: block; width: 100%; }
+  ul.alerts button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  ul.alerts .who { font-weight: 600; }
+  ul.alerts .why { color: var(--text-secondary); font-size: 13px; }
+  .tag { display: inline-block; margin-left: 6px; padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; background: var(--hover); color: var(--text-secondary); vertical-align: 1px; }
+
+  /* recording dock */
+  .dock { border: 1px solid var(--border); background: var(--surface); }
+  .dock-row { display: flex; flex-wrap: wrap; gap: 12px 16px; align-items: flex-end; }
+  .field { display: flex; flex-direction: column; gap: 4px; }
+  .fl { font-size: 12px; color: var(--text-secondary); font-weight: 500; }
+  .drop { display: flex; flex-direction: column; justify-content: center; min-width: 250px; flex: 1 1 250px; padding: 9px 16px; cursor: pointer;
+          border: 1.5px dashed var(--border); border-radius: 12px; background: var(--raise); }
+  .drop:hover, .drop.over { border-color: var(--accent); background: var(--hover); }
+  .drop input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+  .drop:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .drop .drop-t { font-weight: 600; font-size: 14px; max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .drop .drop-s { font-size: 12px; color: var(--text-muted); }
+  .upload { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .msg { font-size: 13px; margin-top: 8px; min-height: 18px; color: var(--text-secondary); }
+  .msg.err { color: var(--critical); font-weight: 500; }
+  .msg.good { color: var(--good); font-weight: 500; }
+
+  /* foot maps */
+  .feet { display: flex; justify-content: center; gap: 14px; flex-wrap: wrap; }
+  .foot { text-align: center; width: 168px; }
+  .foot svg { width: 118px; height: auto; display: block; margin: 0 auto; }
+  .hero .foot { width: 190px; }
+  .hero .foot svg { width: 140px; }
+  .foot .cap { font-weight: 600; font-size: 13px; margin-bottom: 4px; }
+  .foot .shares { display: flex; justify-content: center; flex-wrap: wrap; gap: 0 8px; font-size: 12px; color: var(--text-secondary); margin-top: 4px; }
+  .scale { display: flex; align-items: center; gap: 8px; justify-content: center; font-size: 12px; color: var(--text-secondary); margin-top: 10px; }
+  .scale .bar { width: 160px; height: 10px; border-radius: 5px; border: 1px solid var(--border); }
+  .controls[hidden] { display: none; }
+  .controls { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; margin-bottom: 12px; }
+  .controls input[type=range] { flex: 1 1 160px; min-width: 120px; }
+  .controls .time { font-variant-numeric: tabular-nums; min-width: 92px; font-size: 13px; color: var(--text-secondary); }
+  .cmp-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .cmp-cols .col { padding: 14px 8px 12px; border-radius: 14px; }
+  .cmp-cols .col h3 { font: 600 13px var(--display); margin: 0 0 6px; text-align: center; }
+  .notes-list { list-style: none; padding: 0; margin: 0 0 10px; max-height: 240px; overflow: auto; }
+  .notes-list li { padding: 8px 0; border-bottom: 1px solid var(--border); }
+  .notes-list .meta { color: var(--text-secondary); font-size: 12px; }
+  .printonly { display: none; }
+
+  /* AI screening */
+  .aihead { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin-bottom: 8px; }
+  .aihead h2 { margin: 0; }
+  .ribbon { display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: 12px; font-weight: 600;
+            color: var(--warn); border: 1px solid var(--warn); background: color-mix(in srgb, var(--warn) 12%, transparent); }
+  .aibig { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 12px; }
+  .aibig .score { font: 700 40px/1.1 var(--display); letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .aibig .band { font-size: 16px; font-weight: 600; }
+  .gauge { position: relative; display: flex; height: 12px; border-radius: 6px; border: 1px solid var(--border); margin: 16px 2px 4px; }
+  .gauge i { display: block; height: 100%; }
+  .gauge i:nth-child(1) { width: 35%; background: color-mix(in srgb, var(--text-muted) 10%, transparent); border-radius: 6px 0 0 6px; }
+  .gauge i:nth-child(2) { width: 15%; background: color-mix(in srgb, var(--text-muted) 24%, transparent); }
+  .gauge i:nth-child(3) { width: 50%; background: color-mix(in srgb, var(--text-muted) 42%, transparent); border-radius: 0 6px 6px 0; }
+  .gauge .mk { position: absolute; top: -5px; width: 6px; height: 20px; margin-left: -3px; border-radius: 3px;
+               background: var(--m-cv); border: 2px solid var(--surface); box-sizing: content-box; }
+  .gaugelbl { display: flex; font-size: 12px; color: var(--text-secondary); margin: 0 2px; }
+  .gaugelbl span:nth-child(1) { width: 35%; } .gaugelbl span:nth-child(2) { width: 15%; text-align: center; white-space: nowrap; overflow: visible; } .gaugelbl span:nth-child(3) { width: 50%; text-align: right; }
+
+  .win { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 2px 0 8px; }
+  .win input[type=range] { flex: 1 1 160px; min-width: 120px; accent-color: var(--accent); }
+  .win .time { font-size: 13px; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+  .win[hidden] { display: none; }
+  .qgrid { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 18px; align-items: start; }
+  .st { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; }
+  .st.ok { background: var(--good-bg); color: var(--good); } .st.weak, .st.saturated { background: var(--warn-bg); color: var(--warn); } .st.flat { background: var(--critical-bg); color: var(--critical); }
+  .bars { display: grid; gap: 10px; }
+  .bar-row { display: grid; grid-template-columns: 96px minmax(0, 1fr) 64px; align-items: center; gap: 10px; font-size: 13px; }
+  .bar-row .track { height: 14px; border-radius: 7px; background: var(--hover); overflow: hidden; }
+  .bar-row .fill { height: 100%; border-radius: 7px; background: var(--ink); }
+  .bar-row .val { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+  .bar-row .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cmpcharts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+  .importres { list-style: none; margin: 8px 0 0; padding: 0; font-size: 13px; }
+  .importres li { padding: 3px 0; } .importres .bad { color: var(--critical); }
+  .pairrow { display: grid; grid-template-columns: 54px minmax(0, 1fr); gap: 4px 10px; align-items: center; font-size: 13px; margin-bottom: 8px; }
+  .pairrow .zn { font-weight: 600; }
+  .pbar { display: flex; align-items: center; gap: 8px; }
+  .pbar .track { flex: 1; height: 10px; border-radius: 5px; background: var(--hover); overflow: hidden; }
+  .pbar .fill { height: 100%; border-radius: 5px; }
+  .pbar .v { min-width: 74px; text-align: right; font-variant-numeric: tabular-nums; font-size: 12px; color: var(--text-secondary); }
+  @media (max-width: 860px) { .qgrid, .cmpcharts { grid-template-columns: minmax(0, 1fr); } }
+  @media (max-width: 1040px) { .hide-md { display: none; } .hero { grid-template-columns: minmax(0, 1fr); } }
+  @media (max-width: 860px) { .hide-md2 { display: none; } }
+  @media (max-width: 1040px) { #trendRow { grid-template-columns: 1fr !important; } }
+  @media (max-width: 760px) {
+    .shell { grid-template-columns: minmax(0, 1fr); }
+    .rail { position: static; height: auto; flex-direction: row; justify-content: flex-start; padding: 8px 12px; }
+    .logo { margin: 0 8px 0 0; width: 36px; height: 36px; }
+    .rail a { width: auto; flex-direction: row; gap: 6px; padding: 8px 12px; }
+    .rail .spacer { display: none; }
+    .wrap { padding: 16px 14px 32px; }
+    .kpis { grid-template-columns: 1fr 1fr; }
+    .two, .cmp-cols { grid-template-columns: 1fr; }
+    .hide-sm { display: none; }
+    .pstrip .tools { margin-left: 0; }
+  }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } button { transition: none; } }
+  @media print {
+    body { background: #fff; color: #000; }
+    .noprint, .rail, .filters, .controls { display: none !important; }
+    .shell { display: block; }
+    .printonly { display: block; }
+    .wrap { max-width: none; padding: 0; }
+    .card { break-inside: avoid; box-shadow: none; }
+    .two { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+  <nav class="rail" aria-label="Sections">
+    <svg class="logo" viewBox="0 0 48 48" role="img" aria-label="Smart insole">
+      <rect width="48" height="48" rx="12" fill="#2a78d6"/>
+      <path d="M17 9c3-1 6 1 6.4 5 .4 4-1 7-2 10-.8 2.400-.4 5-1.400 7-.8 1.600-3 2-4.400 1-1.600-1-1.800-3.400-1.400-5.600.6-3.400 0-5-.2-8.200C13.800 15 14.400 10 17 9z" fill="#fff"/>
+      <path d="M32 15c2.600.2 4.200 3 3.800 6.600-.4 3.400-1.600 5-1.800 8-.2 2.800.2 5.600-1.800 7-1.600 1-3.800 0-4.400-2-.8-2.600.4-5 1-7.600.6-2.600.2-4.400.6-7C29.800 17 30.600 14.800 32 15z" fill="#fff" opacity=".72"/>
+    </svg>
+    <a href="#/" id="tabCase" aria-current="page">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c.4-3.600 3-5.500 6-5.500s5.600 1.900 6 5.500"/><circle cx="17.500" cy="9" r="2.400"/><path d="M17 14.200c2.400 0 3.800 1.600 4.200 4.300"/></svg>
+      Patients
+    </a>
+    <a href="#/alerts" id="tabAlerts">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 17V11a6 6 0 0 1 12 0v6l1.500 2h-15z"/><path d="M10 21a2 2 0 0 0 4 0"/></svg>
+      Alerts<span class="count" id="alertCount"></span>
+    </a>
+    <a href="#/people" id="tabPeople">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>
+      Compare
+    </a>
+    <span class="spacer"></span>
+  </nav>
+
+  <div class="wrap">
+    <header class="topline">
+      <h1 class="brand">Smart insole<small>Gait monitoring from six foot-pressure sensors</small></h1>
+      <span id="demoBadge" class="badge" hidden>Demo data: simulated, not real patients</span>
+    </header>
+
+    <!-- ======================= CASELOAD ======================= -->
+    <section id="v-caseload">
+      <div class="grid kpis" id="caseKpis" aria-label="Patient summary"></div>
+
+      <div class="filters gap">
+        <input type="search" id="q" placeholder="Search patient or condition" aria-label="Search patients" size="26">
+        <div class="seg" role="group" aria-label="Filter" id="caseFilter">
+          <button type="button" data-f="all" aria-pressed="true">All</button>
+          <button type="button" data-f="review" aria-pressed="false">Needs review</button>
+          <button type="button" data-f="worsening" aria-pressed="false">Worsening</button>
+          <button type="button" data-f="improving" aria-pressed="false">Improving</button>
+          <button type="button" data-f="overdue" aria-pressed="false">No recent session</button>
+        </div>
+        <label class="note">Sort
+          <select id="sort" aria-label="Sort patients">
+            <option value="priority">Priority</option>
+            <option value="name">Name</option>
+            <option value="last">Last session</option>
+            <option value="cv">Variability</option>
+            <option value="asym">Asymmetry</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="card">
+        <div class="scroll"><table id="caseTable" aria-label="All patients"></table></div>
+        <div class="note" id="caseCount" style="margin-top:8px"></div>
+      </div>
+
+      <div class="card gap" id="importCard">
+        <h2>Import recordings</h2>
+        
+        <div class="dock-row">
+          <label class="drop" id="importDrop">
+            <input type="file" id="importFiles" accept=".csv" multiple aria-label="Recording CSV files">
+            <span class="drop-t" id="importT">Choose recordings (.csv)</span>
+            <span class="drop-s">Patient = first word of the file name</span>
+          </label>
+          <div class="field"><span class="fl" id="impModeLbl">Recording type</span>
+            <div class="seg" role="group" aria-labelledby="impModeLbl" id="impMode">
+              <button type="button" data-m="inplace" aria-pressed="true">Stepping in place</button>
+              <button type="button" data-m="walk" aria-pressed="false">Walking</button>
+              <button type="button" data-m="auto" aria-pressed="false">Auto</button>
+            </div>
+          </div>
+          <button type="button" class="primary" id="importBtn">Import and analyse</button>
+        </div>
+        <ul class="importres" id="importRes"></ul>
+      </div>
+
+      <div class="card gap">
+        <h2>Add a patient</h2>
+        <div class="upload">
+          <input type="text" id="newName" placeholder="Name" aria-label="New patient name" size="20">
+          <input type="text" id="newCond" placeholder="Condition (optional)" aria-label="Condition" size="28">
+          <button type="button" class="primary" id="addBtn">Add patient</button>
+        </div>
+        <div class="msg" id="addMsg" role="status"></div>
+      </div>
+    </section>
+
+    <!-- ======================= PATIENT ======================= -->
+    <section id="v-patient" hidden>
+      <div class="pstrip">
+        <a class="back noprint" href="#/">&larr; All patients</a>
+        <div>
+          <h2 class="name" id="pName"></h2>
+          <span class="note" id="condition"></span>
+        </div>
+        <div class="tools noprint">
+          <label class="note">Patient <select id="patient" aria-label="Patient"></select></label>
+          <div class="seg" role="group" aria-label="Date range" id="range">
+            <button type="button" data-r="all" aria-pressed="true">All</button>
+            <button type="button" data-r="30" aria-pressed="false">30 days</button>
+            <button type="button" data-r="7" aria-pressed="false">7 days</button>
+          </div>
+          <button type="button" id="csvBtn">Export CSV</button>
+          <button type="button" id="printBtn">Print summary</button>
+        </div>
+      </div>
+      <div class="printonly note" id="printLine"></div>
+
+      <section class="card dock noprint" id="uploadCard" aria-label="Analyse a recording">
+        <div class="dock-row">
+          <label class="drop" id="drop">
+            <input type="file" id="file" accept=".csv" aria-label="Recording CSV">
+            <span class="drop-t" id="dropT">Choose a recording (.csv)</span>
+            <span class="drop-s">or drop it here. Use the CSV saved by record.py</span>
+          </label>
+          <div class="field"><span class="fl" id="upModeLbl">Recording type</span>
+            <div class="seg" role="group" aria-labelledby="upModeLbl" id="upMode">
+              <button type="button" data-m="inplace" aria-pressed="true">Stepping in place</button>
+              <button type="button" data-m="walk" aria-pressed="false">Walking</button>
+              <button type="button" data-m="auto" aria-pressed="false">Auto</button>
+            </div>
+          </div>
+          <div class="field"><label class="fl" for="label">Session name</label>
+            <input type="text" id="label" value="home walk" size="14"></div>
+          <button type="button" class="primary" id="uploadBtn">Analyse recording</button>
+        </div>
+        <div class="msg" id="uploadMsg" role="status"></div>
+      </section>
+
+      <main id="main" class="gap">
+        <section class="hero">
+          <div class="card plate" id="playCard">
+            <h2 id="mapTitle">Foot pressure map</h2>
+            <div class="controls">
+              <div class="seg" role="group" aria-label="Map mode" id="mapMode">
+                <button type="button" data-m="avg" aria-pressed="true">Average loading</button>
+                <button type="button" data-m="play" aria-pressed="false">Playback</button>
+              </div>
+            </div>
+            <div class="controls" id="playControls" hidden>
+              <button type="button" id="playBtn" aria-label="Play or pause">Play</button>
+              <input type="range" id="scrub" min="0" max="0" value="0" aria-label="Position in the recording">
+              <span class="time" id="timeLbl">0.0 s</span>
+              <span class="time" id="stepLbl" style="font-weight:700;color:var(--text-primary)"></span>
+              <select id="speed" aria-label="Playback speed">
+                <option value="0.25">0.25x</option><option value="0.5" selected>0.5x</option><option value="1">1x</option>
+              </select>
+            </div>
+            <div id="mapHost"></div>
+            <div class="scale"><span>low</span><span class="bar" id="scaleBar"></span><span>high</span></div>
+            
+          </div>
+          <div class="hero-right">
+            <section class="grid kpis" aria-label="Latest session summary" id="kpis"></section>
+            <p class="modenote" id="modeNote" hidden></p>
+            <section class="card" id="traceCard" style="flex:1">
+              <h2 id="traceTitle">Foot pressure in the selected session</h2>
+              <div class="win" id="traceWinRow">
+                <div class="seg" role="group" aria-label="Time window" id="traceWin">
+                  <button type="button" data-w="15" aria-pressed="false">15 s</button>
+                  <button type="button" data-w="30" aria-pressed="true">30 s</button>
+                  <button type="button" data-w="0" aria-pressed="false">Whole recording</button>
+                </div>
+                <input type="range" id="tracePan" min="0" max="0" value="0" step="1" aria-label="Move the time window">
+                <span class="time" id="traceRange"></span>
+              </div>
+              <div class="legend" id="traceLegend"></div>
+              <div class="chart" id="trace"></div>
+            </section>
+          </div>
+        </section>
+
+        <section class="card gap" id="qCard" aria-label="Sensor quality and left-right matching">
+          <h2>Sensor quality and left–right matching</h2>
+          <div class="qgrid">
+            <div><div class="legend" id="qLegend"></div><div id="qPairs"></div></div>
+            <div class="scroll"><table id="qTable" aria-label="Quality of each pad"></table></div>
+          </div>
+        </section>
+
+        <section class="card gap" id="aiCard" aria-label="AI gait screening">
+          <div class="aihead">
+            <h2>AI gait screening</h2>
+            <span class="badge">research prototype</span>
+            <span class="ribbon" id="aiRibbon" hidden>Illustrative values: AI model not loaded</span>
+          </div>
+          <div class="grid two" style="align-items:start">
+            <div id="aiNow"></div>
+            <div><div class="legend" id="aiLegend"></div><div class="chart" id="aiTrend"></div></div>
+          </div>
+          
+        </section>
+
+        <section class="grid gap" style="align-items:start;grid-template-columns:minmax(0,5fr) minmax(0,7fr)" id="trendRow">
+          <div class="card">
+            <h2>Rehabilitation trend</h2>
+            <div class="legend" id="trendLegend"></div>
+            <div class="chart" id="trend"></div>
+          </div>
+          <div class="card">
+            <h2>Sessions</h2>
+            <div class="scroll"><table id="sessions" aria-label="Sessions for the selected patient"></table></div>
+          </div>
+        </section>
+
+        <section class="card gap" id="cmpCard">
+          <h2>Compare two sessions</h2>
+          <div class="filters" style="margin-bottom:10px">
+            <label>A <select id="cmpA" aria-label="Session A"></select></label>
+            <label>B <select id="cmpB" aria-label="Session B"></select></label>
+          </div>
+          <div class="cmp-cols">
+            <div class="col plate"><h3 id="cmpTitleA">A</h3><div id="cmpMapA"></div></div>
+            <div class="col plate"><h3 id="cmpTitleB">B</h3><div id="cmpMapB"></div></div>
+          </div>
+          <div class="scroll" style="margin-top:10px"><table id="cmpTable" aria-label="Comparison of session A and B"></table></div>
+        </section>
+
+        <section class="card gap">
+          <h2>Clinical notes</h2>
+          <ul class="notes-list" id="notes"></ul>
+          <div class="noprint">
+            <textarea id="noteText" placeholder="Add a note for this patient" aria-label="New note"></textarea>
+            <div class="upload" style="margin-top:8px"><button type="button" id="noteBtn">Save note</button><span class="msg" id="noteMsg" role="status" style="margin:0"></span></div>
+          </div>
+        </section>
+      </main>
+    </section>
+
+    <!-- ======================= COMPARE PEOPLE ======================= -->
+    <section id="v-people" hidden>
+      <div class="card">
+        <h2>Latest session of each person</h2>
+        <div class="scroll"><table id="peopleTable" aria-label="Latest session of each patient"></table></div>
+        
+      </div>
+      <div class="cmpcharts gap" id="peopleCharts"></div>
+    </section>
+
+    <!-- ======================= ALERTS ======================= -->
+    <section id="v-alerts" hidden>
+      <div class="card">
+        <h2>Alerts across all patients</h2>
+        <ul class="alerts" id="alerts" style="max-height:none"></ul>
+      </div>
+    </section>
+
+    <p class="note" style="margin-top:20px">Course prototype. Not a medical device.</p>
+  </div>
+</div>
+
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+const state = { caseload: [], pid: null, sessions: [], range: "all", sid: null, trace: null,
+                filter: "all", sort: "priority", q: "", mode: "avg", sortDir: 1, upMode: "inplace", win: 30, winStart: 0, shownPid: null };
+const MODE_NAME = { inplace: "Stepping in place", walk: "Walking", auto: "Auto" };
+function setAlertCount(n) { $("alertCount").textContent = n ? String(n) : ""; }
+const SVGNS = "http://www.w3.org/2000/svg";
+
+function h(tag, props, ...kids) {
+  const el = document.createElement(tag);
+  for (const [k, v] of Object.entries(props || {})) {
+    if (k === "class") el.className = v; else if (k === "text") el.textContent = v; else el.setAttribute(k, v);
+  }
+  for (const kid of kids) el.append(kid);
+  return el;
+}
+function s(tag, attrs, text) {
+  const el = document.createElementNS(SVGNS, tag);
+  for (const [k, v] of Object.entries(attrs || {})) el.setAttribute(k, v);
+  if (text !== undefined) el.textContent = text;
+  return el;
+}
+async function api(path, opts) {
+  const r = await fetch(path, opts);
+  if (!r.ok) {
+    let d = r.statusText;
+    try { d = (await r.json()).detail || d; } catch (e) {}
+    throw new Error(d);
+  }
+  return r.json();
+}
+const fmtDate = (iso) => new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+const fmtDateTime = (iso) => new Date(iso).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+const ago = (d) => d === null ? "" : d === 0 ? "today" : d === 1 ? "1 day ago" : d + " days ago";
+
+/* ---------- generic line chart: axes, direct labels, crosshair tooltip ---------- */
+function niceTicks(lo, hi, n) {
+  const span = hi - lo || 1, raw = span / n, mag = Math.pow(10, Math.floor(Math.log10(raw)));
+  const step = [1, 2, 2.5, 5, 10].map((m) => m * mag).find((x) => x >= raw);
+  const start = Math.floor(lo / step) * step, out = [];
+  for (let v = start; ; v += step) { out.push(+v.toFixed(6)); if (v >= hi - step * 0.001) break; }
+  return out;
+}
+function lineChart(el, o) {
+  el.replaceChildren();
+  const xs = o.x, n = xs.length;
+  if (n < 2) { el.append(h("div", { class: "empty", text: o.emptyText })); return; }
+  const W = Math.max(el.clientWidth || 520, 280), H = 250;
+  const m = { l: 40, r: W < 420 ? 70 : 84, t: 16, b: 30 };
+  const all = o.series.flatMap((d) => d.values);
+  let yMax = Math.max(...all, o.yMinRange || 0), yMin = 0;
+  const yt = niceTicks(yMin, yMax, 4); yMax = yt[yt.length - 1];
+  const xMin = xs[0], xMax = xs[n - 1];
+  const X = (v) => m.l + ((v - xMin) / (xMax - xMin || 1)) * (W - m.l - m.r);
+  const Y = (v) => H - m.b - ((v - yMin) / (yMax - yMin || 1)) * (H - m.t - m.b);
+  const svg = s("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": o.aria });
+  svg.append(s("title", {}, o.aria));
+  yt.forEach((v) => {
+    svg.append(s("line", { x1: m.l, x2: W - m.r, y1: Y(v), y2: Y(v), stroke: "var(--grid)", "stroke-width": 1 }));
+    svg.append(s("text", { x: m.l - 6, y: Y(v), "text-anchor": "end", "dominant-baseline": "central", fill: "var(--text-secondary)", "font-size": 12 }, String(v)));
+  });
+  if (o.yUnit) svg.append(s("text", { x: 4, y: 8, fill: "var(--text-secondary)", "font-size": 12 }, o.yUnit));
+  o.xTicks.forEach((v) => {
+    svg.append(s("text", { x: X(v), y: H - 8, "text-anchor": "middle", fill: "var(--text-secondary)", "font-size": 12 }, o.xFmt(v)));
+  });
+  o.series.forEach((d) => {
+    const pts = d.values.map((v, i) => `${X(xs[i]).toFixed(1)},${Y(v).toFixed(1)}`).join(" ");
+    svg.append(s("polyline", { points: pts, fill: "none", stroke: d.color, "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round" }));
+    if (n <= 30) d.values.forEach((v, i) => svg.append(s("circle", { cx: X(xs[i]), cy: Y(v), r: 4, fill: d.color, stroke: "var(--surface-1)", "stroke-width": 2 })));
+  });
+  (o.marks || []).forEach((mk) => mk.xs.forEach((x0) => {
+    let bi = 0, bd = Infinity;
+    xs.forEach((v, i) => { const d = Math.abs(v - x0); if (d < bd) { bd = d; bi = i; } });
+    const cx = X(xs[bi]), cy = Y(o.series[mk.series].values[bi]);
+    svg.append(s("path", { d: `M${cx - 4.5},${cy - 9} L${cx + 4.5},${cy - 9} L${cx},${cy - 2.500}Z`, fill: mk.color, stroke: "var(--surface)", "stroke-width": 1 }));
+  }));
+  const ends = o.series.map((d) => ({ d, y: Y(d.values[n - 1]) })).sort((a, b) => a.y - b.y);
+  for (let i = 1; i < ends.length; i++) if (ends[i].y - ends[i - 1].y < 15) ends[i].y = ends[i - 1].y + 15;
+  ends.forEach((e) => {
+    svg.append(s("line", { x1: W - m.r + 6, x2: W - m.r + 18, y1: e.y, y2: e.y, stroke: e.d.color, "stroke-width": 3, "stroke-linecap": "round" }));
+    svg.append(s("text", { x: W - m.r + 22, y: e.y, "dominant-baseline": "central", fill: "var(--text-primary)", "font-size": 12 }, e.d.short || e.d.name));
+  });
+  const cross = s("line", { y1: m.t, y2: H - m.b, stroke: "var(--text-muted)", "stroke-width": 1, "stroke-dasharray": "3 3", visibility: "hidden" });
+  svg.append(cross);
+  const hit = s("rect", { x: m.l, y: m.t, width: W - m.l - m.r, height: H - m.t - m.b, fill: "transparent", tabindex: 0, "aria-label": "Chart readout: use left and right arrow keys" });
+  svg.append(hit);
+  const tip = h("div", { class: "tip" }); tip.hidden = true;
+  const show = (i) => {
+    const px = X(xs[i]);
+    cross.setAttribute("x1", px); cross.setAttribute("x2", px); cross.setAttribute("visibility", "visible");
+    tip.replaceChildren(h("div", { class: "t", text: o.tipTitle(i) }));
+    o.series.forEach((d) => {
+      const k = h("span", { class: "k" }); k.style.borderTopColor = d.color;
+      tip.append(h("div", { class: "r" }, k, h("span", { class: "v", text: d.values[i] + (o.unit || "") }), h("span", { class: "n", text: d.name })));
+    });
+    tip.hidden = false;
+    const scale = el.clientWidth / W, tw = tip.offsetWidth;
+    let left = px * scale + 12; if (left + tw > el.clientWidth) left = px * scale - tw - 12;
+    tip.style.left = Math.max(left, 0) + "px"; tip.style.top = "8px";
+  };
+  const nearest = (evt) => {
+    const r = svg.getBoundingClientRect(), x = ((evt.clientX - r.left) / r.width) * W;
+    let best = 0, bd = Infinity;
+    xs.forEach((v, i) => { const d = Math.abs(X(v) - x); if (d < bd) { bd = d; best = i; } });
+    return best;
+  };
+  let cur = n - 1;
+  hit.addEventListener("pointermove", (e) => { cur = nearest(e); show(cur); });
+  hit.addEventListener("pointerdown", (e) => { cur = nearest(e); show(cur); });
+  hit.addEventListener("pointerleave", () => { tip.hidden = true; cross.setAttribute("visibility", "hidden"); });
+  hit.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowLeft") cur = Math.max(cur - 1, 0); else if (e.key === "ArrowRight") cur = Math.min(cur + 1, n - 1); else return;
+    e.preventDefault(); show(cur);
+  });
+  hit.addEventListener("blur", () => { tip.hidden = true; cross.setAttribute("visibility", "hidden"); });
+  el.append(svg, tip);
+}
+function legend(el, items) {
+  el.replaceChildren(...items.map((i) => { const sp = h("span", { text: i.name }); sp.style.setProperty("--c", i.color); return sp; }));
+}
+
+/* ---------- icons and small widgets ---------- */
+const OK_ICON = '<svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="9" fill="var(--good)"/><path d="M5.5 10.5l3 3 6-6.5" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const ALERT_ICON = '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2L19 18H1z" fill="var(--critical)"/><path d="M10 7.5v5" stroke="#fff" stroke-width="2" stroke-linecap="round"/><circle cx="10" cy="15" r="1.2" fill="#fff"/></svg>';
+const TREND_ICON = {
+  Improving: ['var(--good)', "M3 13l5-5 3 3 6-6M12 5h5v5"],
+  Worsening: ['var(--critical)', "M3 7l5 5 3-3 6 6M12 15h5v-5"],
+  Stable: ['var(--text-muted)', "M3 10h14M13 6l4 4-4 4"],
+  Mixed: ['var(--warn)', "M3 7h14M13 3l4 4-4 4M17 13H3M7 9l-4 4 4 4"],
+  New: ['var(--text-muted)', "M5 10h10"],
+};
+function statusChip(alert, text) {
+  const sp = h("span", { class: "status" });
+  sp.insertAdjacentHTML("beforeend", alert ? ALERT_ICON : OK_ICON);   // static icon markup only
+  sp.append(document.createTextNode(text || (alert ? "Needs review" : "Within limits")));
+  return sp;
+}
+function trendChip(label) {
+  const [color, d] = TREND_ICON[label] || TREND_ICON.New;
+  const sp = h("span", { class: "trendchip" });
+  const svg = s("svg", { viewBox: "0 0 20 20", "aria-hidden": "true" });
+  svg.append(s("path", { d, fill: "none", stroke: color, "stroke-width": 2, "stroke-linecap": "round", "stroke-linejoin": "round" }));
+  sp.append(svg, document.createTextNode(label));
+  return sp;
+}
+function sparkline(values, color, label) {
+  const W = 84, H = 24, svg = s("svg", { viewBox: `0 0 ${W} ${H}`, width: W, height: H, role: "img", "aria-label": label });
+  if (values.length < 2) return svg;
+  const lo = Math.min(...values), hi = Math.max(...values), pad = 4;
+  const X = (i) => pad + (i / (values.length - 1)) * (W - 2 * pad);
+  const Y = (v) => H - pad - ((v - lo) / (hi - lo || 1)) * (H - 2 * pad);
+  svg.append(s("polyline", { points: values.map((v, i) => `${X(i).toFixed(1)},${Y(v).toFixed(1)}`).join(" "),
+    fill: "none", stroke: color, "stroke-width": 1.6, "stroke-linejoin": "round", "stroke-linecap": "round" }));
+  svg.append(s("circle", { cx: X(values.length - 1), cy: Y(values[values.length - 1]), r: 2.6, fill: color, stroke: "var(--surface-1)", "stroke-width": 1.5 }));
+  return svg;
+}
+
+/* ---------- foot map ---------- */
+// Sequential ramp for the dark pressure plate (indigo to amber, brighter means more load). Zero loading shows no colour at all.
+const RAMP = ["#5b3bb0", "#9c3f9f", "#d9506a", "#f58b4a", "#ffd36b"];
+const hex = (c) => [1, 3, 5].map((i) => parseInt(c.slice(i, i + 2), 16));
+function ramp(v) {
+  v = Math.max(0, Math.min(1, v));
+  const x = v * (RAMP.length - 1), i = Math.min(Math.floor(x), RAMP.length - 2), f = x - i;
+  const a = hex(RAMP[i]), b = hex(RAMP[i + 1]);
+  return "rgb(" + a.map((c, k) => Math.round(c + (b[k] - c) * f)).join(",") + ")";
+}
+const FOOT_PATH = "M44 6C60 0 82 8 86 32C90 56 84 84 74 108C68 124 66 140 67 162C68 188 72 206 68 226C64 244 50 250 38 248C24 246 18 232 20 214C22 192 22 168 20 142C18 112 8 84 8 56C8 30 26 12 44 6Z";
+const ZONES = { toe: { x: 48, y: 46, r: 30 }, mid: { x: 46, y: 138, r: 26 }, heel: { x: 44, y: 214, r: 28 } };
+const FULL = 0.85;   // a drop of 85% of full scale gets the darkest colour
+let footUid = 0;
+function makeFoot(side) {
+  const uid = ++footUid, mirror = side === "R";
+  const svg = s("svg", { viewBox: "0 0 100 252", role: "img", "aria-label": (mirror ? "Right" : "Left") + " foot pressure map" });
+  const defs = s("defs");
+  const clip = s("clipPath", { id: "clip" + uid }); clip.append(s("path", { d: FOOT_PATH }));
+  const blur = s("filter", { id: "blur" + uid, x: "-30%", y: "-30%", width: "160%", height: "160%" });
+  blur.append(s("feGaussianBlur", { stdDeviation: 7 }));
+  defs.append(clip, blur); svg.append(defs);
+  const g = s("g", mirror ? { transform: "translate(100,0) scale(-1,1)" } : {});
+  g.append(s("path", { d: FOOT_PATH, fill: "var(--foot-fill)", stroke: "var(--text-muted)", "stroke-width": 1.5 }));
+  const heat = s("g", { "clip-path": `url(#clip${uid})` });
+  const blobs = {};
+  const inner = s("g", { filter: `url(#blur${uid})` });
+  for (const [z, p] of Object.entries(ZONES)) { blobs[z] = s("circle", { cx: p.x, cy: p.y, r: p.r, fill: "none", opacity: 0 }); inner.append(blobs[z]); }
+  heat.append(inner); g.append(heat);
+  g.append(s("path", { d: FOOT_PATH, fill: "none", stroke: "var(--text-muted)", "stroke-width": 1.5 }));
+  for (const p of Object.values(ZONES)) g.append(s("circle", { cx: p.x, cy: p.y, r: 3, fill: "none", stroke: "var(--text-muted)", "stroke-width": 1, "stroke-dasharray": "2 2" }));
+  svg.append(g);
+  return { svg, set(vals) {
+    for (const z of Object.keys(ZONES)) {
+      const v = Math.max(0, Math.min(1, vals ? vals[z] || 0 : 0));
+      blobs[z].setAttribute("fill", ramp(v)); blobs[z].setAttribute("opacity", v < 0.02 ? 0 : (0.35 + 0.65 * v).toFixed(2));
+    }
+  } };
+}
+function makeFeetPair() {
+  const L = makeFoot("L"), R = makeFoot("R");
+  const shL = h("div", { class: "shares" }), shR = h("div", { class: "shares" });
+  const el = h("div", { class: "feet" },
+    h("div", { class: "foot" }, h("div", { class: "cap", text: "Left foot" }), L.svg, shL),
+    h("div", { class: "foot" }, h("div", { class: "cap", text: "Right foot" }), R.svg, shR));
+  const pc = (v) => Math.round(v * 100) + "%";
+  const setShares = (el, z, msg) => {
+    el.replaceChildren();
+    if (!z) { el.textContent = msg || ""; return; }
+    [["Toe", z.toe], ["Mid", z.mid], ["Heel", z.heel]].forEach(([n, v]) => el.append(h("span", { text: `${n} ${pc(v.peak)}` })));
+  };
+  return {
+    el,
+    // average loading from stored zone summaries, scaled to the busiest of the six zones
+    setAverage(zones) {
+      if (!zones || !zones.L) { L.set(null); R.set(null); setShares(shL, null, "No map stored for this session"); setShares(shR, null); return; }
+      const norm = (f) => Object.fromEntries(["toe", "mid", "heel"].map((z) => [z, zones[f][z].peak / FULL]));
+      L.set(norm("L")); R.set(norm("R"));
+      setShares(shL, zones.L); setShares(shR, zones.R);
+    },
+    setFrame(ch, i) {
+      L.set({ toe: ch.L_toe[i] / FULL, mid: ch.L_mid[i] / FULL, heel: ch.L_heel[i] / FULL });
+      R.set({ toe: ch.R_toe[i] / FULL, mid: ch.R_mid[i] / FULL, heel: ch.R_heel[i] / FULL });
+    },
+    clearShares() { shL.replaceChildren(); shR.replaceChildren(); },
+  };
+}
+$("scaleBar").style.background = `linear-gradient(90deg, ${RAMP.join(",")})`;
+
+/* ---------- routing ---------- */
+function parseHash() {
+  const m = location.hash.match(/^#\/patient\/(\d+)(?:\/session\/(\d+))?/);
+  if (m) return { view: "patient", pid: +m[1], sid: m[2] ? +m[2] : null };
+  if (location.hash.startsWith("#/alerts")) return { view: "alerts" };
+  if (location.hash.startsWith("#/people")) return { view: "people" };
+  return { view: "caseload" };
+}
+function go(hash) { if (location.hash === hash) route(); else location.hash = hash; }
+async function route() {
+  const r = parseHash();
+  stopPlay();
+  ["caseload", "patient", "alerts", "people"].forEach((v) => { $("v-" + v).hidden = v !== r.view; });
+  $("tabCase").setAttribute("aria-current", r.view === "caseload" || r.view === "patient" ? "page" : "false");
+  $("tabAlerts").setAttribute("aria-current", r.view === "alerts" ? "page" : "false");
+  $("tabPeople").setAttribute("aria-current", r.view === "people" ? "page" : "false");
+  if (r.view === "caseload") { $("demoBadge").hidden = !state.caseload.some((p) => p.demo); renderCaseload(); }
+  else if (r.view === "people") { $("demoBadge").hidden = !state.caseload.some((p) => p.demo); renderPeople(); }
+  else if (r.view === "alerts") { $("demoBadge").hidden = !state.caseload.some((p) => p.demo); await renderAlerts(); }
+  else { await loadPatient(r.pid, r.sid); }
+  window.scrollTo(0, 0);
+}
+
+/* ---------- caseload ---------- */
+const isReview = (p) => p.last && p.last.alert;
+const isOverdue = (p) => p.days_since !== null && p.days_since >= 14;
+function priority(p) {      // higher = look at first
+  return (isReview(p) ? 1000 + 10 * p.last.flags.length : 0) + (p.trend.label === "Worsening" ? 100 : 0) + (isOverdue(p) ? 50 : 0) + (p.days_since || 0) * 0.1;
+}
+function renderCaseload() {
+  const all = state.caseload;
+  const kpi = (label, value, sub) => h("div", { class: "card kpi" }, h("div", { class: "label", text: label }), h("div", { class: "value", text: String(value) }), h("div", { class: "sub", text: sub }));
+  const nRev = all.filter(isReview).length, nWor = all.filter((p) => p.trend.label === "Worsening").length,
+        nImp = all.filter((p) => p.trend.label === "Improving").length, nOver = all.filter(isOverdue).length;
+  $("caseKpis").replaceChildren(
+    kpi("Patients", all.length, `${all.reduce((a, p) => a + p.n_sessions, 0)} sessions in total`),
+    kpi("Need review", nRev, "latest session outside limits"),
+    kpi("Worsening", nWor, `${nImp} improving`),
+    kpi("No recent session", nOver, "14 days or more"));
+
+  const q = state.q.trim().toLowerCase();
+  let rows = all.filter((p) => {
+    if (q && !(p.name + " " + p.condition).toLowerCase().includes(q)) return false;
+    return { all: true, review: isReview(p), worsening: p.trend.label === "Worsening", improving: p.trend.label === "Improving", overdue: isOverdue(p) }[state.filter];
+  });
+  const cmp = {
+    priority: (a, b) => priority(b) - priority(a),
+    name: (a, b) => a.name.localeCompare(b.name),
+    last: (a, b) => (a.days_since ?? 1e9) - (b.days_since ?? 1e9),
+    cv: (a, b) => (b.last ? b.last.stride_cv : -1) - (a.last ? a.last.stride_cv : -1),
+    asym: (a, b) => (b.last ? b.last.asym : -1) - (a.last ? a.last.asym : -1),
+  }[state.sort];
+  rows = [...rows].sort(cmp);
+
+  const tb = $("caseTable"); tb.replaceChildren();
+  const head = h("tr");
+  [["Patient", ""], ["Status", ""], ["Trend", ""], ["Last session", "hide-sm hide-md2"], ["Variability %", "num"], ["Variability, recent", "hide-sm hide-md"], ["Asymmetry %", "num hide-sm hide-md2"], ["AI score", "num hide-sm"]]
+    .forEach(([t, c]) => head.append(h("th", { scope: "col", class: c, text: t })));
+  tb.append(h("thead", {}, head));
+  const body = h("tbody");
+  rows.forEach((p) => {
+    const tr = h("tr", { class: "click", tabindex: 0 });
+    const l = p.last;
+    tr.append(
+      h("td", {}, h("span", { text: p.name, style: "font-weight:600" }), h("span", { class: "sub", text: p.condition })),
+      h("td", {}, l ? statusChip(l.alert) : h("span", { class: "note", text: "No sessions" })),
+      h("td", {}, trendChip(p.trend.label)),
+      h("td", { class: "hide-sm hide-md2" }, h("span", { text: l ? fmtDate(l.recorded_at) : "" }),
+        isOverdue(p) ? h("span", { class: "overdue", style: "display:block", text: p.days_since + " days ago, overdue" }) : h("span", { class: "sub", text: ago(p.days_since) })),
+      h("td", { class: "num", text: l ? l.stride_cv.toFixed(1) : "" }),
+      h("td", { class: "spark hide-sm hide-md" }), h("td", { class: "num hide-sm hide-md2", text: l ? l.asym.toFixed(1) : "" }),
+      h("td", { class: "num hide-sm", text: aiText(l) || "–" }));
+    tr.children[5].append(sparkline(p.spark_cv, "var(--m-cv)", `Stride variability over the last ${p.spark_cv.length} sessions`));
+    const open = () => go("#/patient/" + p.id);
+    tr.addEventListener("click", open);
+    tr.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); } });
+    body.append(tr);
+  });
+  tb.append(body);
+  if (!rows.length) tb.after(h("div", { class: "empty", id: "caseEmpty", text: "No patients match." }));
+  else { const e = $("caseEmpty"); if (e) e.remove(); }
+  $("caseCount").textContent = `Showing ${rows.length} of ${all.length} patients. Sorted by ${$("sort").selectedOptions[0].textContent.toLowerCase()}. The sparkline shows stride variability over recent sessions. AI score: Parkinson-like pattern, 0 to 1 (* = illustrative preview value).`;
+}
+
+/* ---------- AI screening ---------- */
+const aiOk = (x) => x && x.ai && x.ai.ok;
+function aiText(x) {
+  if (!x || !x.ai || !x.ai.ok) return "";
+  return x.ai.score.toFixed(2) + (x.ai.preview ? "*" : "");
+}
+function renderAi(list) {
+  const card = $("aiCard");
+  card.hidden = !list.length;
+  if (!list.length) return;
+  const last = list[list.length - 1], a = last.ai || {};
+  const now = $("aiNow"); now.replaceChildren();
+  $("aiRibbon").hidden = !(a.ok && a.preview);
+  if (a.ok) {
+    const eff = a.band;
+    const bandText = { low: "Low Parkinson-like pattern", uncertain: "Inconclusive", high: "Parkinson-like pattern shown" }[eff];
+    now.append(
+      h("div", { class: "note", text: "Latest session " + fmtDate(last.recorded_at) }),
+      h("div", { class: "aibig" }, h("span", { class: "score", text: a.score.toFixed(2) }), h("span", { class: "band", text: bandText })),
+      h("div", { class: "note", style: "margin:4px 0 0", text: "This is only an indicator, not a diagnosis." }),
+      (() => { const g = h("div", { class: "gauge", role: "img", "aria-label": `Score ${a.score.toFixed(2)} on a scale from 0 to 1` }, h("i"), h("i"), h("i"));
+               const mk = h("span", { class: "mk" }); mk.style.left = (a.score * 100).toFixed(1) + "%"; g.append(mk); return g; })(),
+      h("div", { class: "gaugelbl" }, h("span", { text: "low  0" }), h("span", { text: "inconclusive" }), h("span", { text: "pattern shown  1" })),
+      h("span"));
+  } else {
+    now.append(h("div", { class: "empty", style: "padding:12px 0;text-align:left",
+      text: a.reason || "Not screened. Recordings are screened when they are uploaded with the AI model installed." }));
+  }
+  const pts = list.filter(aiOk);
+  const series = [{ name: "Parkinson-like score", short: "Score", color: "var(--m-cv)", values: pts.map((x) => x.ai.score) }];
+  legend($("aiLegend"), series);
+  const xs = pts.map((x) => new Date(x.recorded_at).getTime()), k = Math.min(5, xs.length);
+  const ticks = xs.length > 1 ? Array.from({ length: k }, (_, i) => xs[0] + ((xs[xs.length - 1] - xs[0]) * i) / (k - 1)) : [];
+  lineChart($("aiTrend"), { x: xs, series, unit: "", yUnit: "score (0 to 1)", yMinRange: 1, xTicks: ticks,
+    xFmt: (v) => fmtDate(new Date(v).toISOString()), tipTitle: (i) => fmtDateTime(pts[i].recorded_at),
+    aria: "Line chart of the AI screening score across sessions, from 0 to 1. The sessions table lists the same values.",
+    emptyText: "Two or more screened sessions are needed for a trend." });
+}
+
+/* ---------- patient view ---------- */
+function visibleSessions() {
+  if (state.range === "all") return state.sessions;
+  const cutoff = Date.now() - Number(state.range) * 86400000;
+  return state.sessions.filter((x) => new Date(x.recorded_at).getTime() >= cutoff);
+}
+function renderKpis(list) {
+  const el = $("kpis"); el.replaceChildren();
+  const note = $("modeNote"); note.hidden = true;
+  if (!list.length) {
+    el.append(h("div", { class: "card empty", style: "grid-column:1/-1" }, h("b", { text: "No recordings yet" }), document.createTextNode("Choose a recording above and press Analyse recording.")));
+    return;
+  }
+  const last = list[list.length - 1], first = list[0], inplace = last.mode === "inplace";
+  const delta = (key, unit) => {
+    if (list.length < 2) return "";
+    const d = last[key] - first[key];
+    return `${d >= 0 ? "+" : "−"}${Math.abs(d).toFixed(1)}${unit} since ${fmtDate(first.recorded_at)}`;
+  };
+  const tile = (label, value, unit, sub) => h("div", { class: "card kpi" },
+    h("div", { class: "label", text: label }),
+    h("div", { class: "value" }, document.createTextNode(value), h("span", { class: "unit", text: unit })),
+    h("div", { class: "sub", text: sub }));
+  const ex = last.extra || {};
+  el.append(
+    tile("Steps counted", String(last.steps), "steps", ex.steps_l != null ? `left ${ex.steps_l}, right ${ex.steps_r}, in ${(ex.recording_s || last.duration_s).toFixed(0)} s` : `in ${last.duration_s.toFixed(0)} s`),
+    tile(inplace ? "Step rate" : "Cadence", last.cadence.toFixed(0), "steps/min", delta("cadence", "")),
+    tile(inplace ? "Step-time variability" : "Stride variability", last.stride_cv.toFixed(1), "%", delta("stride_cv", " pts")),
+    tile(inplace ? "Contact-time asymmetry" : "Stance asymmetry", last.asym.toFixed(1), "%", delta("asym", " pts")));
+  const st = h("div", { class: "card kpi " + (last.alert ? "bad" : "ok") }, h("div", { class: "label", text: "Latest session, " + fmtDate(last.recorded_at) }),
+    h("div", { class: "value" }, statusChip(last.alert)), h("div", { class: "sub", text: MODE_NAME[last.mode] || "" }));
+  el.append(st);
+}
+function renderTrend(list) {
+  const xs = list.map((x) => new Date(x.recorded_at).getTime());
+  const series = [
+    { name: "Stance asymmetry", short: "Asymmetry", color: "var(--m-asym)", values: list.map((x) => x.asym) },
+    { name: "Stride variability", short: "Variability", color: "var(--m-cv)", values: list.map((x) => x.stride_cv) },
+  ];
+  legend($("trendLegend"), series);
+  const k = Math.min(5, xs.length);
+  const ticks = xs.length > 1 ? Array.from({ length: k }, (_, i) => xs[0] + ((xs[xs.length - 1] - xs[0]) * i) / (k - 1)) : [];
+  lineChart($("trend"), {
+    x: xs, series, unit: "%", yUnit: "%", xTicks: ticks, xFmt: (v) => fmtDate(new Date(v).toISOString()),
+    tipTitle: (i) => fmtDateTime(list[i].recorded_at),
+    aria: "Line chart of stance asymmetry and stride variability across sessions. The sessions table lists the same values.",
+    emptyText: "Two or more sessions are needed for a trend.",
+  });
+}
+function traceSlice() {
+  const t = state.trace; if (!t) return null;
+  const total = t.t[t.t.length - 1], w = state.win > 0 && state.win < total ? state.win : 0;
+  const maxStart = w ? Math.max(0, total - w) : 0;
+  state.winStart = Math.max(0, Math.min(state.winStart, maxStart));
+  const t0 = w ? state.winStart : 0, t1 = w ? t0 + w : total;
+  let i0 = 0, i1 = t.t.length - 1;
+  while (i0 < i1 && t.t[i0] < t0) i0++;
+  while (i1 > i0 && t.t[i1] > t1) i1--;
+  return { t0, t1, i0, i1, total, w, maxStart };
+}
+function renderTrace() {
+  const t = state.trace;
+  const sel = state.sessions.find((x) => x.id === state.sid);
+  const sl = traceSlice();
+  const winTxt = !sl ? "" : sl.w ? `${sl.t0.toFixed(0)} to ${sl.t1.toFixed(0)} s of ${sl.total.toFixed(0)} s` : `whole recording, ${sl.total.toFixed(0)} s`;
+  $("traceTitle").textContent = sel ? `Foot pressure, ${fmtDateTime(sel.recorded_at)}` : "Foot pressure in the selected session";
+  const series = t ? [
+    { name: "Left foot", short: "Left", color: "var(--foot-l)", values: t.L.slice(sl.i0, sl.i1 + 1) },
+    { name: "Right foot", short: "Right", color: "var(--foot-r)", values: t.R.slice(sl.i0, sl.i1 + 1) },
+  ] : [];
+  legend($("traceLegend"), series);
+  $("traceWinRow").hidden = !t;
+  if (!t) { $("trace").replaceChildren(h("div", { class: "empty", text: "Select a session." })); return; }
+  const pan = $("tracePan");
+  pan.hidden = !sl.w || sl.maxStart <= 0;
+  pan.max = String(Math.ceil(sl.maxStart)); pan.value = String(Math.round(state.winStart));
+  $("traceRange").textContent = winTxt + (t.marks ? ", triangles = steps" : "");
+  document.querySelectorAll("#traceWin button").forEach((b) => b.setAttribute("aria-pressed", String(Number(b.dataset.w) === state.win)));
+  const xs = t.t.slice(sl.i0, sl.i1 + 1), span = sl.t1 - sl.t0;
+  const step = span <= 20 ? 2 : span <= 40 ? 5 : span <= 80 ? 10 : 20;
+  const ticks = []; for (let v = Math.ceil(sl.t0 / step) * step; v <= sl.t1 + 1e-9; v += step) ticks.push(v);
+  const inWin = (arr) => (arr || []).filter((v) => v >= sl.t0 && v <= sl.t1);
+  const mk = t.marks ? [{ series: 0, xs: inWin(t.marks.L), color: "var(--foot-l)" }, { series: 1, xs: inWin(t.marks.R), color: "var(--foot-r)" }] : [];
+  lineChart($("trace"), {
+    marks: mk, x: xs, series, yUnit: "relative pressure (0 to 1)", xTicks: ticks, xFmt: (v) => v + " s",
+    tipTitle: (i) => xs[i].toFixed(2) + " s", yMinRange: 1,
+    aria: `Line chart of left and right foot pressure, ${winTxt}. Peaks are footsteps, and the feet alternate.`,
+    emptyText: "No trace stored for this session.",
+  });
+}
+
+/* sensor quality and left-right matching for the selected session */
+function renderQuality() {
+  const sel = state.sessions.find((x) => x.id === state.sid), x = sel && sel.extra || {};
+  const card = $("qCard"), pads = x.pads;
+  card.hidden = true;     // the per-pad quality table is not shown in the web app
+  return;
+  if (!pads) return;
+  const loads = x.loads, lb = new Set(x.lower_bound || []);
+  const val = (n) => loads ? loads[n] : pads[n].range / 4095;
+  const mx = Math.max(0.0001, ...["toe", "mid", "heel"].flatMap((z) => [val("L_" + z), val("R_" + z)]));
+  const fmtV = (n) => loads ? (lb.has(n) ? "≥ " : "") + loads[n].toFixed(1) : Math.round(pads[n].range / 40.95) + "%";
+  legend($("qLegend"), [{ name: "Left pad", color: "var(--foot-l)" }, { name: "Right pad", color: "var(--foot-r)" }]);
+  const host = $("qPairs"); host.replaceChildren();
+  host.append(h("div", { class: "sub", style: "margin-bottom:6px", text: loads ? "Peak load per pad (≥ = pad bottoms out)" : "Signal swing per pad (% of ADC range)" }));
+  [["toe", "Toe"], ["mid", "Mid-foot"], ["heel", "Heel"]].forEach(([z, nm]) => {
+    const row = h("div", { class: "pairrow" }, h("div", { class: "zn", text: nm }));
+    const col = h("div");
+    [["L_" + z, "var(--foot-l)"], ["R_" + z, "var(--foot-r)"]].forEach(([n, c]) => {
+      const f = h("div", { class: "fill" }); f.style.width = Math.max(1, (val(n) / mx) * 100) + "%"; f.style.background = c;
+      col.append(h("div", { class: "pbar" }, h("div", { class: "track" }, f), h("div", { class: "v", text: fmtV(n) })));
+    });
+    row.append(col); host.append(row);
+  });
+  const bad = Object.entries(pads).filter(([, p]) => p.status !== "ok").map(([n, p]) => n.replace("_", " ") + " (" + p.status + ")");
+  const tb = $("qTable"); tb.replaceChildren();
+  const hd = h("tr"); [["Pad", ""], ["Bottomed out", "num"], ["Swing", "num"], ["Peak load", "num"], ["Status", ""]].forEach(([t, c]) => hd.append(h("th", { scope: "col", class: c, text: t })));
+  tb.append(h("thead", {}, hd));
+  const body = h("tbody");
+  Object.keys(pads).forEach((n) => {
+    const p = pads[n];
+    body.append(h("tr", {}, h("td", { text: n.replace("_", " ") }), h("td", { class: "num", text: p.sat.toFixed(0) + "%" }),
+      h("td", { class: "num", text: Math.round(p.range / 40.95) + "%" }), h("td", { class: "num", text: loads ? fmtV(n) : "–" }),
+      h("td", {}, h("span", { class: "st " + p.status, text: p.status }))));
+  });
+  tb.append(body);
+}
+
+/* compare the latest session of every person */
+function renderPeople() {
+  const rows = state.caseload.filter((p) => p.last);
+  const tb = $("peopleTable"); tb.replaceChildren();
+  const hd = h("tr"); [["Person", ""], ["Type", "hide-sm"], ["Steps/min", "num"], ["Var. %", "num"], ["Asym. %", "num"], ["Left load", "num hide-sm"], ["Measure", "hide-sm"], ["AI", "num"], ["Status", ""]]
+    .forEach(([t, c]) => hd.append(h("th", { scope: "col", class: c, text: t })));
+  tb.append(h("thead", {}, hd));
+  const body = h("tbody");
+  rows.forEach((p) => {
+    const x = p.last, ls = x.extra && x.extra.load_share_l;
+    const tr = h("tr", { class: "click", tabindex: 0 },
+      h("td", { text: p.name }), h("td", { class: "hide-sm", text: MODE_NAME[x.mode] || "" }),
+      h("td", { class: "num", text: x.cadence.toFixed(0) }), h("td", { class: "num", text: x.stride_cv.toFixed(1) }), h("td", { class: "num", text: x.asym.toFixed(1) }),
+      h("td", { class: "num hide-sm", text: ls != null ? Math.round(ls) + "%" : "–" }),
+      h("td", { class: "hide-sm", text: x.extra && x.extra.spread ? (x.extra.reliable ? "Stable" : "Uncertain") : "–" }), h("td", { class: "num", text: aiText(x) || "–" }),
+      h("td", {}, statusChip(x.alert, x.alert ? "Review" : "OK")));
+    const open = () => go("#/patient/" + p.id);
+    tr.addEventListener("click", open); tr.addEventListener("keydown", (e) => { if (e.key === "Enter") open(); });
+    body.append(tr);
+  });
+  if (!rows.length) body.append(h("tr", {}, h("td", { colspan: 9, text: "No recordings yet." })));
+  tb.append(body);
+  const host = $("peopleCharts"); host.replaceChildren();
+  const chart = (title, key, unit, color) => {
+    const vals = rows.map((p) => p.last[key]), mx = Math.max(0.0001, ...vals);
+    const box = h("div", { class: "card" }, h("h2", { text: title }));
+    const bars = h("div", { class: "bars" });
+    rows.forEach((p, i) => {
+      const f = h("div", { class: "fill" }); f.style.width = Math.max(1, (vals[i] / mx) * 100) + "%"; f.style.background = color;
+      bars.append(h("div", { class: "bar-row" }, h("div", { class: "nm", text: p.name }), h("div", { class: "track" }, f), h("div", { class: "val", text: vals[i].toFixed(key === "cadence" ? 0 : 1) + unit })));
+    });
+    box.append(bars); return box;
+  };
+  if (rows.length) host.append(chart("Step rate (steps/min)", "cadence", "", "var(--accent)"), chart("Step-time variability (%)", "stride_cv", "%", "var(--m-cv)"),
+    chart("Left–right asymmetry (%)", "asym", "%", "var(--m-asym)"));
+}
+
+/* bulk import */
+async function importFiles() {
+  const files = [...$("importFiles").files], ul = $("importRes"); ul.replaceChildren();
+  if (!files.length) { ul.append(h("li", { class: "bad", text: "Choose one or more CSV files first." })); return; }
+  const fd = new FormData(); files.forEach((f) => fd.append("files", f)); fd.append("mode", state.impMode || "inplace");
+  ul.append(h("li", { text: "Analysing " + files.length + " file(s)..." }));
+  try {
+    const res = await api("/api/import", { method: "POST", body: fd });
+    ul.replaceChildren();
+    res.forEach((r) => ul.append(r.ok
+      ? h("li", { text: `${r.file}: added to ${r.patient}, ${r.cadence.toFixed(0)} steps/min, variability ${r.stride_cv.toFixed(1)}%, asymmetry ${r.asym.toFixed(1)}%` })
+      : h("li", { class: "bad", text: `${r.file}: ${r.error}` })));
+    $("importFiles").value = ""; $("importT").textContent = "Choose recordings (.csv)";
+    await refreshCaseload(); fillPatientSelect();
+    if (state.emptyStart) { location.reload(); return; }
+    renderCaseload(); api("/api/alerts").then((r) => setAlertCount(r.length)).catch(() => {});
+  } catch (e) { ul.replaceChildren(h("li", { class: "bad", text: "Import failed: " + e.message })); }
+}
+function renderTable(list) {
+  const tb = $("sessions"); tb.replaceChildren();
+  const head = h("tr");
+  [["Date", ""], ["Type", "hide-sm"], ["Steps/min", "num"], ["Var. %", "num"], ["Asym. %", "num"], ["AI", "num"], ["Status", ""]]
+    .forEach(([t, c]) => head.append(h("th", { scope: "col", class: c, text: t })));
+  tb.append(h("thead", {}, head));
+  const body = h("tbody");
+  [...list].reverse().forEach((x) => {
+    const tr = h("tr", { class: "click", tabindex: 0, "aria-selected": String(x.id === state.sid) });
+    tr.append(h("td", { text: fmtDateTime(x.recorded_at) }), h("td", { class: "hide-sm" }, document.createTextNode(x.label), h("span", { class: "sub", text: MODE_NAME[x.mode] || "" })),
+      h("td", { class: "num", text: x.cadence.toFixed(0) }), h("td", { class: "num", text: x.stride_cv.toFixed(1) }),
+      h("td", { class: "num", text: x.asym.toFixed(1) }), h("td", { class: "num", text: aiText(x) || "–" }), h("td", {}, statusChip(x.alert, x.alert ? "Review" : "OK")));
+    const pick = () => selectSession(x.id);
+    tr.addEventListener("click", pick);
+    tr.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); pick(); } });
+    body.append(tr);
+  });
+  tb.append(body);
+}
+
+/* foot map card: average loading or playback of the selected session */
+const mapPair = makeFeetPair();
+$("mapHost").append(mapPair.el);
+const play = { on: false, i: 0, acc: 0, last: 0, raf: 0 };
+function stopPlay() { play.on = false; cancelAnimationFrame(play.raf); play.last = 0; $("playBtn").textContent = "Play"; }
+function frameCount() { return state.trace && state.trace.ch ? state.trace.t.length : 0; }
+function showFrame(i) {
+  const n = frameCount(); if (!n) return;
+  play.i = Math.max(0, Math.min(n - 1, i));
+  mapPair.setFrame(state.trace.ch, play.i);
+  $("scrub").value = play.i; $("timeLbl").textContent = state.trace.t[play.i].toFixed(1) + " s / " + state.trace.t[n - 1].toFixed(1) + " s";
+  const mk = state.trace.marks, now = state.trace.t[play.i];
+  if (mk) { const l = (mk.L || []).filter((v) => v <= now).length, r = (mk.R || []).filter((v) => v <= now).length;
+    $("stepLbl").textContent = `Steps ${l + r} (L ${l}, R ${r})`; } else $("stepLbl").textContent = "";
+}
+function tick(ts) {
+  if (!play.on) return;
+  if (!play.last) play.last = ts;
+  play.acc += ((ts - play.last) / 1000) * ((state.trace && state.trace.hz) || 25) * Number($("speed").value); play.last = ts;
+  const adv = Math.floor(play.acc);
+  if (adv > 0) { play.acc -= adv; showFrame((play.i + adv) % frameCount()); }
+  play.raf = requestAnimationFrame(tick);
+}
+function renderMap() {
+  const sel = state.sessions.find((x) => x.id === state.sid);
+  $("mapTitle").textContent = sel ? `Foot pressure map, ${fmtDateTime(sel.recorded_at)}` : "Foot pressure map";
+  const playing = state.mode === "play";
+  document.querySelectorAll("#mapMode button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.m === state.mode)));
+  $("playControls").hidden = !playing;
+  if (!sel) { mapPair.setAverage(null); return; }
+  if (!playing) { stopPlay(); mapPair.setAverage(sel.zones); return; }
+  mapPair.clearShares();
+  const n = frameCount();
+  if (!n) { $("timeLbl").textContent = "No playback data"; mapPair.setAverage(null); return; }
+  $("scrub").max = n - 1; showFrame(play.i < n ? play.i : 0);
+}
+$("mapMode").addEventListener("click", (e) => { const b = e.target.closest("button"); if (!b) return; state.mode = b.dataset.m; renderMap(); });
+$("playBtn").addEventListener("click", () => {
+  if (play.on) { stopPlay(); return; }
+  if (!frameCount()) return;
+  play.on = true; play.acc = 0; play.last = 0; $("playBtn").textContent = "Pause"; play.raf = requestAnimationFrame(tick);
+});
+$("scrub").addEventListener("input", (e) => { stopPlay(); showFrame(Number(e.target.value)); });
+
+/* compare two sessions */
+const cmpA = makeFeetPair(), cmpB = makeFeetPair();
+$("cmpMapA").append(cmpA.el); $("cmpMapB").append(cmpB.el);
+function fillCompareSelects() {
+  const list = state.sessions;
+  [$("cmpA"), $("cmpB")].forEach((sel, k) => {
+    sel.replaceChildren(...list.map((x) => h("option", { value: x.id, text: fmtDate(x.recorded_at) + ", " + x.label })));
+    if (list.length) sel.value = String(list[k === 0 ? 0 : list.length - 1].id);
+  });
+  renderCompare();
+}
+function renderCompare() {
+  const a = state.sessions.find((x) => x.id === Number($("cmpA").value)), b = state.sessions.find((x) => x.id === Number($("cmpB").value));
+  $("cmpCard").hidden = state.sessions.length < 2;
+  if (!a || !b) return;
+  $("cmpTitleA").textContent = "A: " + fmtDateTime(a.recorded_at); $("cmpTitleB").textContent = "B: " + fmtDateTime(b.recorded_at);
+  cmpA.setAverage(a.zones); cmpB.setAverage(b.zones);
+  const rows = [
+    ["Steps/min", "cadence", 0, ""], ["Stride time (s)", "stride_time_s", 2, ""],
+    ["Stride variability (%)", "stride_cv", 1, "lower"], ["Stance asymmetry (%)", "asym", 1, "lower"],
+    ["Stance time, left (s)", "stance_l", 2, ""], ["Stance time, right (s)", "stance_r", 2, ""],
+  ];
+  const tb = $("cmpTable"); tb.replaceChildren();
+  const head = h("tr"); [["Measure", ""], ["A", "num"], ["B", "num"], ["Change (B minus A)", "num"]].forEach(([t, c]) => head.append(h("th", { scope: "col", class: c, text: t })));
+  tb.append(h("thead", {}, head));
+  const body = h("tbody");
+  rows.forEach(([label, key, dp, better]) => {
+    const d = b[key] - a[key], txt = (d >= 0 ? "+" : "−") + Math.abs(d).toFixed(dp);
+    let note = "";
+    if (better && Math.abs(d) >= 10 ** -dp) note = d < 0 ? " (better)" : " (worse)";
+    body.append(h("tr", {}, h("td", { text: label }), h("td", { class: "num", text: a[key].toFixed(dp) }), h("td", { class: "num", text: b[key].toFixed(dp) }), h("td", { class: "num", text: txt + note })));
+  });
+  tb.append(body);
+}
+$("cmpA").addEventListener("change", renderCompare); $("cmpB").addEventListener("change", renderCompare);
+
+/* notes */
+async function loadNotes() {
+  const ul = $("notes"); ul.replaceChildren();
+  const rows = await api(`/api/patients/${state.pid}/notes`);
+  if (!rows.length) { ul.append(h("li", { class: "empty", text: "No notes yet." })); return; }
+  rows.forEach((n) => ul.append(h("li", {}, h("div", { class: "meta", text: `${n.author}, ${fmtDateTime(n.created)}` }), h("div", { text: n.text }))));
+}
+$("noteBtn").addEventListener("click", async () => {
+  const t = $("noteText").value.trim(), msg = $("noteMsg"); msg.className = "msg";
+  if (!t) { msg.className = "msg err"; msg.textContent = "Write a note first."; return; }
+  try {
+    await api(`/api/patients/${state.pid}/notes`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: t, author: "Clinician" }) });
+    $("noteText").value = ""; msg.textContent = "Saved."; await loadNotes();
+  } catch (e) { msg.className = "msg err"; msg.textContent = e.message; }
+});
+
+async function selectSession(id) {
+  state.sid = id;
+  $("main").classList.add("loading");
+  try { state.trace = (await api("/api/sessions/" + id)).trace; } finally { $("main").classList.remove("loading"); }
+  stopPlay(); play.i = 0; state.winStart = 0;
+  renderTable(visibleSessions()); renderTrace(); renderMap(); renderQuality();
+}
+function renderAll() {
+  const list = visibleSessions();
+  if (!list.find((x) => x.id === state.sid)) state.sid = list.length ? list[list.length - 1].id : null;
+  renderKpis(list); renderAi(list); renderTrend(list); renderTable(list);
+  if (state.sid) selectSession(state.sid); else { state.trace = null; renderTrace(); renderMap(); renderQuality(); }
+}
+async function loadPatient(pid, sid) {
+  state.pid = Number(pid);
+  const p = state.caseload.find((x) => x.id === state.pid);
+  if (!p) { go("#/"); return; }
+  $("demoBadge").hidden = !p.demo;
+  $("pName").textContent = p.name; $("condition").textContent = p.condition;
+  $("printLine").textContent = `Gait summary for ${p.name}. Printed ${new Date().toLocaleDateString("en-GB")}. Demo data and illustrative limits; not a medical record.`;
+  $("patient").value = String(p.id);
+  $("main").classList.add("loading");
+  try { state.sessions = await api(`/api/patients/${pid}/sessions`); } finally { $("main").classList.remove("loading"); }
+  state.sid = sid || null;
+  if (state.shownPid !== state.pid) {      /* another person: forget the previous file, message and window */
+    state.shownPid = state.pid; state.winStart = 0; state.trace = null;
+    $("file").value = ""; $("dropT").textContent = "Choose a recording (.csv)";
+    $("uploadMsg").textContent = ""; $("uploadMsg").className = "msg"; $("label").value = $("label").defaultValue || "steady";
+  }
+  renderAll(); fillCompareSelects(); loadNotes().catch(() => {});
+}
+
+/* ---------- alerts ---------- */
+async function renderAlerts() {
+  const ul = $("alerts"); ul.replaceChildren();
+  const rows = await api("/api/alerts");
+  setAlertCount(rows.length);
+  if (!rows.length) { ul.append(h("li", { class: "empty", text: "No alerts." })); return; }
+  rows.forEach((a) => {
+    const b = h("button", { type: "button" }, h("div", { class: "who", text: `${a.patient_name}, ${fmtDateTime(a.recorded_at)}` }), h("div", { class: "why", text: a.flags.join("; ") }));
+    b.addEventListener("click", () => go(`#/patient/${a.patient_id}/session/${a.id}`));
+    ul.append(h("li", {}, b));
+  });
+}
+
+/* ---------- upload, export, add patient ---------- */
+async function refreshCaseload() { state.caseload = await api("/api/caseload"); }
+async function upload() {
+  const f = $("file").files[0], msg = $("uploadMsg");
+  msg.className = "msg";
+  if (!f) { msg.className = "msg err"; msg.textContent = "Choose a recording CSV first."; return; }
+  const fd = new FormData();
+  fd.append("patient_id", state.pid); fd.append("label", $("label").value || "walk"); fd.append("mode", state.upMode); fd.append("file", f);
+  const tm = f.name.match(/_(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})/);
+  if (tm) fd.append("recorded_at", `${tm[1]}-${tm[2]}-${tm[3]}T${tm[4]}:${tm[5]}:${tm[6]}`);   // record.py puts the recording time in the file name
+  msg.textContent = "Analysing...";
+  try {
+    const r = await api("/api/sessions/upload", { method: "POST", body: fd });
+    msg.className = "msg good"; msg.textContent = `Done (${(MODE_NAME[r.mode] || "").toLowerCase()}): ${r.cadence.toFixed(0)} steps/min, variability ${r.stride_cv.toFixed(1)}%, asymmetry ${r.asym.toFixed(1)}%.` + (r.ai && r.ai.ok ? ` AI score ${r.ai.score.toFixed(2)}.` : "");
+    $("file").value = ""; $("dropT").textContent = "Choose a recording (.csv)";
+    await refreshCaseload(); await loadPatient(state.pid, r.id);
+  } catch (e) { msg.className = "msg err"; msg.textContent = "Could not analyse this recording: " + e.message + (state.upMode === "walk" ? " Try the Stepping in place or Auto type." : ""); }
+}
+function exportCsv() {
+  const p = state.caseload.find((x) => x.id === state.pid);
+  const cols = ["recorded_at", "label", "duration_s", "steps", "cadence", "stride_time_s", "stride_cv", "stance_l", "stance_r", "asym"];
+  const lines = [cols.join(",")].concat(state.sessions.map((x) => cols.map((c) => JSON.stringify(x[c] ?? "")).join(",")));
+  const a = h("a", { href: URL.createObjectURL(new Blob([lines.join("\n")], { type: "text/csv" })), download: (p ? p.name.replace(/\W+/g, "_") : "patient") + "_sessions.csv" });
+  document.body.append(a); a.click(); a.remove();
+}
+async function addPatient() {
+  const name = $("newName").value.trim(), msg = $("addMsg"); msg.className = "msg";
+  if (!name) { msg.className = "msg err"; msg.textContent = "Enter a name."; return; }
+  try {
+    const r = await api("/api/patients", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, condition: $("newCond").value.trim() }) });
+    $("newName").value = ""; $("newCond").value = ""; msg.textContent = "Added.";
+    if (state.emptyStart) { location.reload(); return; }
+    await refreshCaseload(); fillPatientSelect(); renderCaseload();
+  } catch (e) { msg.className = "msg err"; msg.textContent = e.message; }
+}
+function fillPatientSelect() {
+  const sel = $("patient"); sel.replaceChildren();
+  state.caseload.forEach((p) => sel.append(h("option", { value: p.id, text: p.name })));
+}
+
+/* ---------- start ---------- */
+async function init() {
+  await refreshCaseload();
+  fillPatientSelect();
+  $("patient").addEventListener("change", (e) => go("#/patient/" + e.target.value));
+  $("q").addEventListener("input", (e) => { state.q = e.target.value; renderCaseload(); });
+  $("sort").addEventListener("change", (e) => { state.sort = e.target.value; renderCaseload(); });
+  document.querySelectorAll("#caseFilter button").forEach((b) => b.addEventListener("click", () => {
+    document.querySelectorAll("#caseFilter button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+    state.filter = b.dataset.f; renderCaseload();
+  }));
+  document.querySelectorAll("#range button").forEach((b) => b.addEventListener("click", () => {
+    document.querySelectorAll("#range button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+    state.range = b.dataset.r; renderAll();
+  }));
+  $("uploadBtn").addEventListener("click", upload);
+  document.querySelectorAll("#upMode button").forEach((b) => b.addEventListener("click", () => {
+    document.querySelectorAll("#upMode button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+    state.upMode = b.dataset.m;
+  }));
+  const dz = $("drop");
+  $("file").addEventListener("change", () => { const f = $("file").files[0]; $("dropT").textContent = f ? f.name : "Choose a recording (.csv)"; });
+  ["dragenter", "dragover"].forEach((ev) => dz.addEventListener(ev, (e) => { e.preventDefault(); dz.classList.add("over"); }));
+  ["dragleave", "drop"].forEach((ev) => dz.addEventListener(ev, (e) => { e.preventDefault(); dz.classList.remove("over"); }));
+  dz.addEventListener("drop", (e) => { if (e.dataTransfer.files.length) { $("file").files = e.dataTransfer.files; $("file").dispatchEvent(new Event("change")); } });
+  $("importBtn").addEventListener("click", importFiles);
+  document.querySelectorAll("#impMode button").forEach((b) => b.addEventListener("click", () => {
+    document.querySelectorAll("#impMode button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+    state.impMode = b.dataset.m;
+  }));
+  const idz = $("importDrop"), ifs = $("importFiles");
+  ifs.addEventListener("change", () => { const n = ifs.files.length; $("importT").textContent = n === 0 ? "Choose recordings (.csv)" : n === 1 ? ifs.files[0].name : n + " files selected"; });
+  ["dragenter", "dragover"].forEach((ev) => idz.addEventListener(ev, (e) => { e.preventDefault(); idz.classList.add("over"); }));
+  ["dragleave", "drop"].forEach((ev) => idz.addEventListener(ev, (e) => { e.preventDefault(); idz.classList.remove("over"); }));
+  idz.addEventListener("drop", (e) => { if (e.dataTransfer.files.length) { ifs.files = e.dataTransfer.files; ifs.dispatchEvent(new Event("change")); } });
+  document.querySelectorAll("#traceWin button").forEach((b) => b.addEventListener("click", () => { state.win = Number(b.dataset.w); state.winStart = 0; renderTrace(); }));
+  $("tracePan").addEventListener("input", (e) => { state.winStart = Number(e.target.value); renderTrace(); });
+  $("csvBtn").addEventListener("click", exportCsv);
+  $("printBtn").addEventListener("click", () => window.print());
+  $("addBtn").addEventListener("click", addPatient);
+  let t; window.addEventListener("resize", () => { clearTimeout(t); t = setTimeout(() => { if (!$("v-patient").hidden) { renderTrend(visibleSessions()); renderAi(visibleSessions()); renderTrace(); } }, 150); });
+  window.addEventListener("hashchange", route);
+  api("/api/alerts").then((r) => setAlertCount(r.length)).catch(() => {});
+  if (!state.caseload.length) {
+    state.emptyStart = true;
+    $("v-caseload").replaceChildren(h("div", { class: "card empty" }, h("b", { text: "No patients yet" }), document.createTextNode("Add a patient below, then open them to analyse a recording.")), $("importBtn").closest(".card"), $("addBtn").closest(".card"));
+    return;
+  }
+  await route();
+}
+init().catch((e) => { document.body.prepend(h("p", { class: "note", text: "Could not load data: " + e.message })); });
+</script>
+</body>
+</html>

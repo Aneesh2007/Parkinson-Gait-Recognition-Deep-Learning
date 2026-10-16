@@ -1,0 +1,24 @@
+{
+ "positions_1based": {
+  "heel": 1,
+  "mid": 4,
+  "toe": 8
+ },
+ "channels": [
+  "L_heel",
+  "L_mid",
+  "L_toe",
+  "R_heel",
+  "R_mid",
+  "R_toe"
+ ],
+ "epochs": 15,
+ "seed": 0,
+ "classes": [
+  "healthy",
+  "parkinsons"
+ ],
+ "windows_train": 28069,
+ "trained_on": "PhysioNet gaitpdb, all subjects",
+ "validation": "5-fold subject-wise macro F1 0.759 (Task 1); leave-one-study-out 0.706"
+}
