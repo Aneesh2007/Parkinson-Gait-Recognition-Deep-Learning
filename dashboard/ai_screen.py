@@ -1,21 +1,7 @@
 """
 AI gait screening for the dashboard: the CNN from Task 1 (3 sensors per foot), run in plain NumPy.
 
-Why NumPy: the cloud app then needs no PyTorch install. The weights come from the Colab export
-cell (cnn_s3.npz). The model is tiny (37,090 parameters).
 
-What it does with an uploaded recording (6 FSR channels, ADC counts, about 100 Hz):
-  1. Convert each channel to a "load" signal: how far the reading dropped below its unloaded level.
-     (The training data is force, which rises with load; our ADC falls with load.)
-  2. Reorder channels to the training order: L heel, L mid, L toe, R heel, R mid, R toe.
-  3. Same preprocessing as training: trim the first and last 2 s of long walks, z-score each channel
-     over the recording, average pairs of samples to 50 Hz, cut 2 s windows with 50% overlap.
-  4. Run the CNN on every window. Output = mean probability of a Parkinson's-like pattern.
-
-IMPORTANT: the model was trained on the public PhysioNet gaitpdb data (a different insole, mostly
-older adults). It has not been validated on this insole. Treat the output as a research prototype
-screening score, never as a diagnosis, and never on patients who do not have Parkinson's questions
-(it only knows "Parkinson's vs healthy").
 """
 import json
 import os
